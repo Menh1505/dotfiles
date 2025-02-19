@@ -1,35 +1,37 @@
--- Pull in the wezterm API
 local wezterm = require("wezterm")
-local io = require("io")
-local math = require("math")
 local os = require("os")
+local math = require("math")
 
 local wallpaper_dir = "C:\\Users\\ADMIN\\Pictures\\wallpaper"
 local last_update_time = os.time() -- Latest time save variable
 local current_wallpaper = nil -- current_wallpaper variable
 
--- Get file in folder (Windows version)
-local function get_wallpapers()
-	local wallpapers = {}
-	-- Use lua API to get file list from folder (Windows)
-	local p = io.popen(
-		"powershell -Command \"Get-ChildItem -Path '" .. wallpaper_dir .. "' -File | ForEach-Object { $_.FullName }\""
-	)
-	if p then
-		for file in p:lines() do
-			table.insert(wallpapers, file)
+-- Lưu danh sách hình nền vào vector chỉ một lần
+local wallpaper_vector = {}
+
+-- Duyệt thư mục một lần và lưu tên tệp
+local function get_wallpapers_once()
+	if #wallpaper_vector == 0 then
+		local p = io.popen(
+			"powershell -Command \"Get-ChildItem -Path '"
+				.. wallpaper_dir
+				.. "' -File | ForEach-Object { $_.FullName }\""
+		)
+		if p then
+			for file in p:lines() do
+				table.insert(wallpaper_vector, file)
+			end
+			p:close()
 		end
-		p:close()
 	end
-	return wallpapers
 end
 
--- Get random from folder
+-- Lấy hình nền ngẫu nhiên từ vector
 local function get_random_wallpaper()
-	local wallpapers = get_wallpapers()
-	if #wallpapers > 0 then
+	get_wallpapers_once() -- Đảm bảo danh sách hình nền đã được lấy
+	if #wallpaper_vector > 0 then
 		math.randomseed(os.time()) -- Init random number
-		local new_wallpaper = wallpapers[math.random(#wallpapers)]
+		local new_wallpaper = wallpaper_vector[math.random(#wallpaper_vector)]
 		return new_wallpaper
 	end
 	return nil
@@ -38,7 +40,7 @@ end
 -- Auto replace wallpaper after time
 wezterm.on("update-right-status", function(window, pane)
 	local now = os.time()
-	-- Check time 600 seconds (10 minutes)
+	-- Kiểm tra thời gian 900 giây (15 phút)
 	if now - last_update_time >= 900 then
 		local new_wallpaper = get_random_wallpaper()
 		if new_wallpaper and new_wallpaper ~= current_wallpaper then
@@ -46,7 +48,7 @@ wezterm.on("update-right-status", function(window, pane)
 			window:set_config_overrides({
 				window_background_image = current_wallpaper,
 			})
-			last_update_time = now -- Update replace wallpaper time
+			last_update_time = now -- Cập nhật thời gian thay đổi hình nền
 		end
 	end
 end)
@@ -62,11 +64,10 @@ local function change_wallpaper(window, pane)
 	end
 end
 
--- This will hold the configuration.
+-- Cấu hình WezTerm
 local config = wezterm.config_builder()
 
--- General settings
-config.enable_tab_bar = false
+config.enable_tab_bar = true
 config.window_decorations = "RESIZE"
 config.window_padding = {
 	left = 0,
